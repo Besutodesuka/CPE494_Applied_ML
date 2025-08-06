@@ -55,21 +55,26 @@ class GreedyWalkRobot(Robot):
         # go in 4 direction
         surrounding_dist = self.distance()
         direction = self.smell()
-        print(surrounding_dist, direction)
+        # print(surrounding_dist, direction)
         # determine quardrant of target
         block_area = select_with_index(surrounding_dist, front_sensor)
-        print(block_area)        
-        if any([i <= 5 for i in  block_area]) :
+        # print(block_area)        
+        if any([i <= 10 for i in  block_area]) :
             avg_dist_left = (surrounding_dist[7] + surrounding_dist[6])/2
-            # avg_dist_right = (surrounding_dist[1] + surrounding_dist[2])/2
+            avg_dist_right = (surrounding_dist[1] + surrounding_dist[2])/2
             if avg_dist_left < 10:
                 self.turn(30)
-            else:
+            elif avg_dist_right < 10:
                 self.turn(-30)
+            else:
+                self.turn(15)
+            if sum(block_area)/len(block_area) < 10:
+                self.turn(180)
+                self.move(10)
             if surrounding_dist[0] > 20:
                 self.move(10)
         else:
-            self.move(5)
+            self.move(3)
         if sum(block_area)/len(block_area) > 70:
             self.turn(direction)
         surrounding_dist = self.distance()
