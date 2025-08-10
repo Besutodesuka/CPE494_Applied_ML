@@ -57,10 +57,10 @@ class GreedyWalkRobot(Robot):
 
     def update(self):
         safety_distance = 25
-        close_distance = 10
+        close_distance = 11
         rear_sensor = [1,7]
         outer_rear = [2,6]
-        front_sensor = [0] + rear_sensor + outer_rear
+        front_sensor = [0] + rear_sensor
         degree_of_turning = 0.5
         turn_degree = 15
         step = 5
@@ -143,5 +143,5 @@ class GreedyWalkRobot(Robot):
         # surrounding_dist = self.distance()
 
 if __name__ == '__main__':
-    app = PySimbotApp(robot_cls=GreedyWalkRobot, num_robots=1)
+    app = PySimbotApp(robot_cls=GreedyWalkRobot, num_robots=1, max_tick=4000)
     app.run()
