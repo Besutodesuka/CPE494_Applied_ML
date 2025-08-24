@@ -74,11 +74,11 @@ class FuzzyRobot(Robot):
         turns.append(-45)
         moves.append(3)
 
-        rules.append(
-            self.mf_far(math.floor(self.target/45))
-                  )
-        turns.append(self.target)
-        moves.append(3)
+        # rules.append(
+        #     self.mf_far(math.floor(self.target/45))
+        #           )
+        # turns.append(self.target)
+        # moves.append(3)
 
 
         # # # turn left if food is left
