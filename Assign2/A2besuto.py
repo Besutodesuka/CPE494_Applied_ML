@@ -24,6 +24,21 @@ START_POINT = (20, 560)
 # Map file
 MAP_FILE = 'maps/default_map.kv'
 
+# def get_adjacent(l: list, n: int, k: int = 2):
+#     temp = [l[n]]
+#     for i in range(1,k+1):
+#         temp.append(l[(n+i)%8])
+#         temp.append(l[(n-i)%8])
+#     return temp
+
+# def mf_free(self, target, threadshold = 0.5):
+#     # filter_ir = get_adjacent(self.ir_values, n = target, k = 1)
+#     filter_ir = self.ir_values
+#     degree = sum(filter_ir)/len(filter_ir)
+#     if degree < threadshold:
+#         return 0
+#     return  ((degree / 100) - threadshold)/(1-threadshold)
+
 class FuzzyRobot(Robot):
 
     def __init__(self):
@@ -47,16 +62,18 @@ class FuzzyRobot(Robot):
         moves.append(5)
 
         # go forward base on front distance toward food
+        target_sensor = math.floor(self.target/45)
         rules.append(max(
-            self.mf_approaching(0),
+             self.mf_approaching(0),
             0
             # self.mf_near(0)
               )
               )
         turns.append(self.target)
         moves.append(2)
+        
 
-        # # move toward food
+        # avoid left
         rules.append(max(
             self.mf_near(6),
             self.mf_near(7),
@@ -65,7 +82,7 @@ class FuzzyRobot(Robot):
         turns.append(45)
         moves.append(3)
 
-         # # move toward food
+         # avoid right
         rules.append(max(
             self.mf_near(2),
             self.mf_near(1),
@@ -73,12 +90,17 @@ class FuzzyRobot(Robot):
                   ))
         turns.append(-45)
         moves.append(3)
+        # rules.append(
+        #     self.mf_near(0)
+        #       )
+        # turns.append(90)
+        # moves.append(-2)
 
         # rules.append(
         #     self.mf_far(math.floor(self.target/45))
         #           )
         # turns.append(self.target)
-        # moves.append(3)
+        # moves.append(1)
 
 
         # # # turn left if food is left
@@ -113,6 +135,12 @@ class FuzzyRobot(Robot):
 
         self.turn(ans_turn)
         self.move(ans_move)
+
+    def mf_free(self, threadshold = 0.5):
+        degree = sum(self.ir_values)/len(self.ir_values)
+        if degree < threadshold:
+            return 0
+        return  ((degree / 100) - threadshold)/(1-threadshold)
         
     def mf_far(self, ir):
         distance = self.ir_values[ir]
