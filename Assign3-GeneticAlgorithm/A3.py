@@ -8,13 +8,15 @@ import random
 import csv
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 
 # # Force the program to show user's log only for "info" level or more. The info log will be disabled.
 # Config.set('kivy', 'log_level', 'debug')
 Config.set('graphics', 'maxfps', 10)
 mutation_rate = 0.02  # 1% mutation rate
-keep_best = 10
-collision_penalty = 3
+pop = 50
+keep_best = int(0.2*pop)
+collision_penalty = 1
 
 class StupidRobot(Robot):
 
@@ -181,6 +183,10 @@ def write_rule(robot, filename):
 # initializing next generation robot list
 next_gen_robots = list()
 
+max_fitness_history = []
+avg_fitness_history = []
+generation_numbers = []
+
 def before_simulation(simbot: Simbot):
     for robot in simbot.robots:
         # random RULES value for the first generation
@@ -210,7 +216,7 @@ def after_simulation(simbot: Simbot):
     # - simbot.robot[0].collision_count
     # - simbot.robot[0].color
 
-    fitness_score = []
+    fitness_values = []
 
     # evaluation – compute fitness values here
     for robot in simbot.robots:
@@ -218,15 +224,15 @@ def after_simulation(simbot: Simbot):
         food_pos = simbot.objectives[0].pos
         robot_pos = robot.pos
         distance = Util.distance(food_pos, robot_pos)
-        near = 1000 - int(distance)
+        near = 500 - int(distance)
         # deduct point from collision
         collision_loss = robot.collision_count * collision_penalty
         # eat bonus
-        obj_bonus =  robot.eat_count * 50
+        obj_bonus =  robot.eat_count * 10
         # out of comfort zone
-        far_from_home = Util.distance(simbot.robot_start_pos,robot_pos) * 0.5 - 500
-        robot.fitness = near - collision_loss + obj_bonus + far_from_home
-        fitness_score.append(robot.fitness)
+        # far_from_home = Util.distance(simbot.robot_start_pos,robot_pos) - 100
+        robot.fitness = near - collision_loss + obj_bonus #+ far_from_home
+        fitness_values.append(robot.fitness)
     
 
 
@@ -256,7 +262,7 @@ def after_simulation(simbot: Simbot):
         return simbot.robots[index]
 
     # dcreate offspring with n = population size - keep best
-    prop = softmax(np.array(fitness_score))
+    prop = softmax(np.array(fitness_values))
     print(prop)
     for _ in range(num_robots - keep_best):
         select1 = roulette_select(prop)   # elite also  can be parent for offspring
@@ -301,10 +307,62 @@ def after_simulation(simbot: Simbot):
     # write the best rule to file
     write_rule(simbot.robots[0], "best_gen{0}.csv".format(simbot.simulation_count))
 
+    max_fitness = max(fitness_values)
+    avg_fitness = sum(fitness_values) / len(fitness_values)
+
+    max_fitness_history.append(max_fitness)
+    avg_fitness_history.append(avg_fitness)
+    generation_numbers.append(simbot.simulation_count)
+
+    Logger.info(f"GA: Generation {simbot.simulation_count} - Max Fitness: {max_fitness:.2f}, Avg Fitness: {avg_fitness:.2f}")
+
+    # Plot learning curves every 10 generations or at specific milestones
+    if simbot.simulation_count % 5 == 0 or simbot.simulation_count == 1:
+        plot_learning_curves()
+
+def plot_learning_curves():
+    """Plot the learning curves showing max and average fitness over generations"""
+    if len(generation_numbers) < 2:
+        return  # Need at least 2 points to plot
+
+    plt.figure(figsize=(10, 6))
+
+    # Plot maximum fitness
+    plt.plot(generation_numbers, max_fitness_history, 'b-', label='Maximum Fitness', linewidth=2)
+
+    # Plot average fitness
+    plt.plot(generation_numbers, avg_fitness_history, 'g-', label='Average Fitness', linewidth=1.5)
+
+    # Fill area between max and avg for better visualization
+    plt.fill_between(generation_numbers, avg_fitness_history, max_fitness_history,
+                     alpha=0.2, color='yellow')
+
+    plt.xlabel('Generation', fontsize=12)
+    plt.ylabel('Fitness', fontsize=12)
+    plt.title('GA Learning Performance', fontsize=14, fontweight='bold')
+    plt.legend(loc='lower right', fontsize=10)
+    plt.grid(True, alpha=0.3)
+
+    # Add statistics text
+    latest_gen = generation_numbers[-1]
+    latest_max = max_fitness_history[-1]
+    latest_avg = avg_fitness_history[-1]
+
+    stats_text = f"Generation {latest_gen}\nMax: {latest_max:.1f}\nAvg: {latest_avg:.1f}"
+    plt.text(0.02, 0.98, stats_text, transform=plt.gca().transAxes,
+             verticalalignment='top', fontsize=10,
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+
+    plt.tight_layout()
+    plt.savefig(f'learning_curve_gen_{latest_gen}.png', dpi=100)
+    plt.close()  # Close to prevent memory issues with many plots
+
+    Logger.info(f"GA: Learning curve saved as learning_curve_gen_{latest_gen}.png")
+
 if __name__ == '__main__':
 
     app = PySimbotApp(robot_cls=StupidRobot, 
-                        num_robots=100,
+                        num_robots=pop,
                         theme='default',
                         simulation_forever=True,
                         max_tick=250,
