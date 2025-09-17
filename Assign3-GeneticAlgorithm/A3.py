@@ -11,6 +11,9 @@ import os
 # # Force the program to show user's log only for "info" level or more. The info log will be disabled.
 # Config.set('kivy', 'log_level', 'debug')
 Config.set('graphics', 'maxfps', 10)
+mutation_rate = 0.01  # 1% mutation rate
+keep_best = 10
+collision_penalty = 3
 
 class StupidRobot(Robot):
 
@@ -208,11 +211,19 @@ def after_simulation(simbot: Simbot):
 
     # evaluation – compute fitness values here
     for robot in simbot.robots:
+        # the closer the food the more reward
         food_pos = simbot.objectives[0].pos
         robot_pos = robot.pos
         distance = Util.distance(food_pos, robot_pos)
-        robot.fitness = 1000 - int(distance)
-        robot.fitness -= robot.collision_count
+        near = 1000 - int(distance)
+        # deduct point from collision
+        collision_loss = robot.collision_count * collision_penalty
+        # eat bonus
+        obj_bonus =  robot.eat_count * 300
+        # out of comfort zone
+        far_from_home = Util.distance(simbot.robot_start_pos,robot_pos) * 0.5
+        robot.fitness = near - collision_loss + obj_bonus + far_from_home
+
 
     # descending sort and rank: the best 10 will be on the list at index 0 to 9
     simbot.robots.sort(key=lambda robot: robot.fitness, reverse=True)
@@ -221,32 +232,56 @@ def after_simulation(simbot: Simbot):
     next_gen_robots.clear()
 
     # adding the best to the next generation.
-    next_gen_robots.append(simbot.robots[0])
+    next_gen_robots.extend(simbot.robots[:keep_best])
 
     num_robots = len(simbot.robots)
 
     def select():
+        # natural select kill lowest fitness before breeding
+        # index = random.randrange(num_robots - keep_best)
         index = random.randrange(num_robots)
         return simbot.robots[index]
 
-    # doing genetic operations
-    for _ in range(num_robots - 1):
-        select1 = select()   # design the way for selection by yourself
-        select2 = select()   # design the way for selection by yourself
+    # dcreate offspring with n = population size - keep best
+    for _ in range(num_robots - keep_best):
+        select1 = select()   # elite also  can be parent for offspring
+        select2 = select()   
 
+        # prevent self cross over
         while select1 == select2:
             select2 = select()
 
         # Doing crossover
         #     using next_gen_robots for temporary keep the offsprings, later they will be copy
         #     to the robots
+        
+        # initial parameter
+        offspring = StupidRobot()
+        offspring.RULES = [[0] * offspring.RULE_LENGTH for _ in range(offspring.NUM_RULES)]
+        # Hints on making Crossover
+        # Crossover
+        for i in range(offspring.NUM_RULES):
+            crossover_point = random.randint(1, offspring.RULE_LENGTH - 1)
+            # First part from parent1, second part from parent2
+            #  list slicing will use number behide ":"" as upper bound and the number in front of ":" is starting point
+            offspring.RULES[i][:crossover_point] = select1.RULES[i][:crossover_point]
+            offspring.RULES[i][crossover_point:] = select2.RULES[i][crossover_point:]
 
-        next_gen_robots.append(select1)
+        next_gen_robots.append(offspring)
 
-        # Doing mutation
-        #     generally scan for all next_gen_robots we have created, and with very low
-        #     propability, change one byte to a new random value.
-        pass
+    # Doing mutation
+    #     generally scan for all next_gen_robots we have created, and with very low
+    #     propability, change one byte to a new random value.
+    
+    # for all robot except elite one
+    for robot in next_gen_robots[keep_best:]:  # Skip the best robot (elite) to save elite
+        # go through each gene
+        for i in range(robot.NUM_RULES):
+            # select point of mutation
+            for j in range(robot.RULE_LENGTH):
+                # if random number lies in mutation rate region (lef tside) then randomly change it with same logic as random initialize
+                if random.random() < mutation_rate:
+                    robot.RULES[i][j] = random.randrange(256)
 
     # write the best rule to file
     write_rule(simbot.robots[0], "best_gen{0}.csv".format(simbot.simulation_count))
@@ -254,10 +289,10 @@ def after_simulation(simbot: Simbot):
 if __name__ == '__main__':
 
     app = PySimbotApp(robot_cls=StupidRobot, 
-                        num_robots=10,
+                        num_robots=100,
                         theme='default',
                         simulation_forever=True,
-                        max_tick=1000,
+                        max_tick=250,
                         interval=1/100.0,
                         food_move_after_eat=False,
                         customfn_before_simulation=before_simulation, 
