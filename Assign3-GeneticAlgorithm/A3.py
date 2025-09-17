@@ -11,7 +11,7 @@ import os
 # # Force the program to show user's log only for "info" level or more. The info log will be disabled.
 # Config.set('kivy', 'log_level', 'debug')
 Config.set('graphics', 'maxfps', 10)
-mutation_rate = 0.01  # 1% mutation rate
+mutation_rate = 0.02  # 1% mutation rate
 keep_best = 10
 collision_penalty = 3
 
@@ -221,7 +221,7 @@ def after_simulation(simbot: Simbot):
         # eat bonus
         obj_bonus =  robot.eat_count * 300
         # out of comfort zone
-        far_from_home = Util.distance(simbot.robot_start_pos,robot_pos) * 0.5
+        far_from_home = 1000 - Util.distance(simbot.robot_start_pos,robot_pos) * 0.5
         robot.fitness = near - collision_loss + obj_bonus + far_from_home
 
 
