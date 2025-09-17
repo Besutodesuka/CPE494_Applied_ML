@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 # Config.set('kivy', 'log_level', 'debug')
 Config.set('graphics', 'maxfps', 10)
 mutation_rate = 0.02  # 1% mutation rate
-pop = 50
-keep_best = int(0.2*pop)
+pop = 100
+keep_best = 1
 collision_penalty = 1
 
 class StupidRobot(Robot):
@@ -232,18 +232,23 @@ def after_simulation(simbot: Simbot):
         # out of comfort zone
         # far_from_home = Util.distance(simbot.robot_start_pos,robot_pos) - 100
         robot.fitness = near - collision_loss + obj_bonus #+ far_from_home
-        fitness_values.append(robot.fitness)
-    
-
 
     # descending sort and rank: the best 10 will be on the list at index 0 to 9
     simbot.robots.sort(key=lambda robot: robot.fitness, reverse=True)
+    for robot in simbot.robots:
+        fitness_values.append(robot.fitness)
+
+    Logger.info(f"fitness sorted: {fitness_values}")
 
     # empty the list
     next_gen_robots.clear()
 
+
+
     # adding the best to the next generation.
     next_gen_robots.extend(simbot.robots[:keep_best])
+    Logger.info(f"number of elite: {len(next_gen_robots)} with top fitness: {simbot.robots[0].fitness}")
+    
 
     num_robots = len(simbot.robots)
 
@@ -263,7 +268,6 @@ def after_simulation(simbot: Simbot):
 
     # dcreate offspring with n = population size - keep best
     prop = softmax(np.array(fitness_values))
-    print(prop)
     for _ in range(num_robots - keep_best):
         select1 = roulette_select(prop)   # elite also  can be parent for offspring
         select2 = roulette_select(prop)   
@@ -279,14 +283,18 @@ def after_simulation(simbot: Simbot):
         # initial parameter
         offspring = StupidRobot()
         offspring.RULES = [[0] * offspring.RULE_LENGTH for _ in range(offspring.NUM_RULES)]
-        # Hints on making Crossover
+        # Hints on making Crossover 
         # Crossover
-        for i in range(offspring.NUM_RULES):
-            crossover_point = random.randint(1, offspring.RULE_LENGTH - 1)
-            # First part from parent1, second part from parent2
-            #  list slicing will use number behide ":"" as upper bound and the number in front of ":" is starting point
-            offspring.RULES[i][:crossover_point] = select1.RULES[i][:crossover_point]
-            offspring.RULES[i][crossover_point:] = select2.RULES[i][crossover_point:]
+        RULE_LENGTH = 11
+        NUM_RULES = 10
+        crossover_point = random.randint(1,RULE_LENGTH*NUM_RULES - 1)
+        # First part from parent1, second part from parent2
+        #  list slicing will use number behide ":"" as upper bound and the number in front of ":" is starting point
+
+        offspring.RULES[:crossover_point//RULE_LENGTH] = select1.RULES[:crossover_point//RULE_LENGTH]
+        offspring.RULES[crossover_point//RULE_LENGTH][:crossover_point%RULE_LENGTH] = select1.RULES[crossover_point//RULE_LENGTH][:crossover_point%RULE_LENGTH]
+        offspring.RULES[crossover_point//RULE_LENGTH][crossover_point%RULE_LENGTH:] = select2.RULES[crossover_point//RULE_LENGTH][crossover_point%RULE_LENGTH:]
+        offspring.RULES[crossover_point//RULE_LENGTH+1:] = select2.RULES[crossover_point//RULE_LENGTH+1:]
 
         next_gen_robots.append(offspring)
 
@@ -365,7 +373,7 @@ if __name__ == '__main__':
                         num_robots=pop,
                         theme='default',
                         simulation_forever=True,
-                        max_tick=250,
+                        max_tick=200,
                         interval=1/100.0,
                         food_move_after_eat=False,
                         customfn_before_simulation=before_simulation, 
