@@ -7,6 +7,7 @@ from kivy.config import Config
 import random
 import csv
 import os
+import numpy as np
 
 # # Force the program to show user's log only for "info" level or more. The info log will be disabled.
 # Config.set('kivy', 'log_level', 'debug')
@@ -209,6 +210,8 @@ def after_simulation(simbot: Simbot):
     # - simbot.robot[0].collision_count
     # - simbot.robot[0].color
 
+    fitness_score = []
+
     # evaluation – compute fitness values here
     for robot in simbot.robots:
         # the closer the food the more reward
@@ -219,10 +222,12 @@ def after_simulation(simbot: Simbot):
         # deduct point from collision
         collision_loss = robot.collision_count * collision_penalty
         # eat bonus
-        obj_bonus =  robot.eat_count * 300
+        obj_bonus =  robot.eat_count * 50
         # out of comfort zone
-        far_from_home = 1000 - Util.distance(simbot.robot_start_pos,robot_pos) * 0.5
+        far_from_home = Util.distance(simbot.robot_start_pos,robot_pos) * 0.5 - 500
         robot.fitness = near - collision_loss + obj_bonus + far_from_home
+        fitness_score.append(robot.fitness)
+    
 
 
     # descending sort and rank: the best 10 will be on the list at index 0 to 9
@@ -236,20 +241,30 @@ def after_simulation(simbot: Simbot):
 
     num_robots = len(simbot.robots)
 
-    def select():
+    def softmax(x):
+        e_x = np.exp(x - np.max(x))  # Subtract max for numerical stability
+        return e_x / e_x.sum(axis=-1) 
+
+    def roulette_select(prop):
+        index = np.random.choice(range(num_robots), p=prop)
+        return simbot.robots[int(index)]
+
+    def random_select(prop):
         # natural select kill lowest fitness before breeding
         # index = random.randrange(num_robots - keep_best)
         index = random.randrange(num_robots)
         return simbot.robots[index]
 
     # dcreate offspring with n = population size - keep best
+    prop = softmax(np.array(fitness_score))
+    print(prop)
     for _ in range(num_robots - keep_best):
-        select1 = select()   # elite also  can be parent for offspring
-        select2 = select()   
+        select1 = roulette_select(prop)   # elite also  can be parent for offspring
+        select2 = roulette_select(prop)   
 
-        # prevent self cross over
+        # prevent self cross over and infinite loop so normal random is needed when some prop is over 70% from softmax
         while select1 == select2:
-            select2 = select()
+            select2 = random_select(prop)
 
         # Doing crossover
         #     using next_gen_robots for temporary keep the offsprings, later they will be copy
