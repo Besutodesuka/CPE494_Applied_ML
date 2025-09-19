@@ -14,9 +14,9 @@ import matplotlib.pyplot as plt
 # Config.set('kivy', 'log_level', 'debug')
 Config.set('graphics', 'maxfps', 10)
 mutation_rate = 0.02  # 1% mutation rate
-pop = 100
-keep_best = 1
-collision_penalty = 1
+pop = 50
+keep_best = 3
+collision_penalty = 0.5
 
 class StupidRobot(Robot):
 
@@ -223,31 +223,34 @@ def after_simulation(simbot: Simbot):
         # the closer the food the more reward
         food_pos = simbot.objectives[0].pos
         robot_pos = robot.pos
+        max_distance = Util.distance(simbot.robot_start_pos, food_pos)
         distance = Util.distance(food_pos, robot_pos)
-        near = 500 - int(distance)
+        near = (max_distance - int(distance))/max_distance * 100
         # deduct point from collision
-        collision_loss = robot.collision_count * collision_penalty
+        collision_loss = min(robot.collision_count * collision_penalty, 100)
         # eat bonus
-        obj_bonus =  robot.eat_count * 10
+        obj_bonus =  min(robot.eat_count * 10, 50)
         # out of comfort zone
         # far_from_home = Util.distance(simbot.robot_start_pos,robot_pos) - 100
         robot.fitness = near - collision_loss + obj_bonus #+ far_from_home
 
-    # descending sort and rank: the best 10 will be on the list at index 0 to 9
-    simbot.robots.sort(key=lambda robot: robot.fitness, reverse=True)
-    for robot in simbot.robots:
-        fitness_values.append(robot.fitness)
-
-    Logger.info(f"fitness sorted: {fitness_values}")
-
     # empty the list
     next_gen_robots.clear()
 
+    # descending sort and rank: the best 10 will be on the list at index 0 to 9
+    simbot.robots.sort(key=lambda robot: robot.fitness, reverse=True)
+    for i, robot in enumerate(simbot.robots):
+        fitness_values.append(robot.fitness)
+        if i < keep_best:
+            # Logger.info("added")
+            next_gen_robots.append(robot)
 
+    Logger.info(f"fitness sorted: {fitness_values}")
+
+    
 
     # adding the best to the next generation.
-    next_gen_robots.extend(simbot.robots[:keep_best])
-    Logger.info(f"number of elite: {len(next_gen_robots)} with top fitness: {simbot.robots[0].fitness}")
+    Logger.info(f"number of elite: {len(next_gen_robots)} with top fitness: {next_gen_robots[0].fitness}")
     
 
     num_robots = len(simbot.robots)
@@ -265,16 +268,36 @@ def after_simulation(simbot: Simbot):
         # index = random.randrange(num_robots - keep_best)
         index = random.randrange(num_robots)
         return simbot.robots[index]
-
+    
+    def tournament_select(size = 2):
+        tournament = []
+        fit_temp = []
+        while len(tournament) < size:
+            robot = random.choice(simbot.robots)
+            if robot.fitness not in fit_temp:
+                tournament.append(robot)
+                fit_temp.append(robot.fitness)
+        tournament.sort(key=lambda robot: robot.fitness, reverse=True)
+        return tournament[0]
+    
     # dcreate offspring with n = population size - keep best
     prop = softmax(np.array(fitness_values))
-    for _ in range(num_robots - keep_best):
-        select1 = roulette_select(prop)   # elite also  can be parent for offspring
-        select2 = roulette_select(prop)   
+    for _ in range(pop - keep_best):
+        select1 = tournament_select(3)   # elite also  can be parent for offspring
+        select2 = tournament_select(3)   
 
         # prevent self cross over and infinite loop so normal random is needed when some prop is over 70% from softmax
-        while select1 == select2:
-            select2 = random_select(prop)
+        # Prevent crossover between genetically identical parents
+        attempts = 0
+        while select1.RULES == select2.RULES and attempts < 10:
+            select2 = tournament_select(2)
+            attempts += 1
+        
+        # If after 10 tries we still have identical parents, the population
+        # has likely converged, so we can just pick a random one to ensure diversity.
+        if select1.RULES == select2.RULES:
+            select2 = random.choice(simbot.robots)
+        
 
         # Doing crossover
         #     using next_gen_robots for temporary keep the offsprings, later they will be copy
@@ -282,35 +305,50 @@ def after_simulation(simbot: Simbot):
         
         # initial parameter
         offspring = StupidRobot()
-        offspring.RULES = [[0] * offspring.RULE_LENGTH for _ in range(offspring.NUM_RULES)]
+        # offspring.RULES = [[0] * offspring.RULE_LENGTH for _ in range(offspring.NUM_RULES)]
         # Hints on making Crossover 
         # Crossover
         RULE_LENGTH = 11
         NUM_RULES = 10
-        crossover_point = random.randint(1,RULE_LENGTH*NUM_RULES - 1)
-        # First part from parent1, second part from parent2
-        #  list slicing will use number behide ":"" as upper bound and the number in front of ":" is starting point
+        crossover_point = random.randint(1, RULE_LENGTH*NUM_RULES-1)
 
-        offspring.RULES[:crossover_point//RULE_LENGTH] = select1.RULES[:crossover_point//RULE_LENGTH]
-        offspring.RULES[crossover_point//RULE_LENGTH][:crossover_point%RULE_LENGTH] = select1.RULES[crossover_point//RULE_LENGTH][:crossover_point%RULE_LENGTH]
-        offspring.RULES[crossover_point//RULE_LENGTH][crossover_point%RULE_LENGTH:] = select2.RULES[crossover_point//RULE_LENGTH][crossover_point%RULE_LENGTH:]
-        offspring.RULES[crossover_point//RULE_LENGTH+1:] = select2.RULES[crossover_point//RULE_LENGTH+1:]
+        # Initialize offspring's RULES with deep copies from select1
+        for i in range(crossover_point // RULE_LENGTH):
+            offspring.RULES[i] = list(select1.RULES[i])
+        
+        # Handle the crossover point within a rule
+        rule_idx = crossover_point // RULE_LENGTH
+        point_in_rule = crossover_point % RULE_LENGTH
+
+        # Copy first part of the rule from select1, second part from select2
+        offspring.RULES[rule_idx] = list(select1.RULES[rule_idx][:point_in_rule]) + list(select2.RULES[rule_idx][point_in_rule:])
+
+        # Copy remaining rules from select2
+        for i in range(crossover_point // RULE_LENGTH + 1, NUM_RULES):
+            offspring.RULES[i] = list(select2.RULES[i])
 
         next_gen_robots.append(offspring)
 
-    # Doing mutation
+    # Doing mutation I will recheck definition again
     #     generally scan for all next_gen_robots we have created, and with very low
     #     propability, change one byte to a new random value.
     
     # for all robot except elite one
-    for robot in next_gen_robots[keep_best:]:  # Skip the best robot (elite) to save elite
-        # go through each gene
+
+    
+    # for robot in next_gen_robots[keep_best:]:  # Skip the best robot (elite) to save elite
+    #     # only mutate at 1 byte
+    #     if random.random() < mutation_rate:
+    #         mutation_point = random.randrange(RULE_LENGTH*NUM_RULES)
+    #         robot.RULES[mutation_point//RULE_LENGTH][mutation_point%RULE_LENGTH] = random.randrange(256)
+
+    for robot in next_gen_robots[keep_best:]:  # Iterate through non-elite offspring
         for i in range(robot.NUM_RULES):
-            # select point of mutation
-            for j in range(robot.RULE_LENGTH):
-                # if random number lies in mutation rate region (lef tside) then randomly change it with same logic as random initialize
+            for k in range(robot.RULE_LENGTH):
+                # For each gene, there is a small chance to mutate
                 if random.random() < mutation_rate:
-                    robot.RULES[i][j] = random.randrange(256)
+                    # Mutate this specific gene to a new random value
+                    robot.RULES[i][k] = random.randrange(256)
 
     # write the best rule to file
     write_rule(simbot.robots[0], "best_gen{0}.csv".format(simbot.simulation_count))
@@ -373,7 +411,7 @@ if __name__ == '__main__':
                         num_robots=pop,
                         theme='default',
                         simulation_forever=True,
-                        max_tick=200,
+                        max_tick=250,
                         interval=1/100.0,
                         food_move_after_eat=False,
                         customfn_before_simulation=before_simulation, 
