@@ -16,7 +16,7 @@ Config.set('graphics', 'maxfps', 10)
 mutation_rate = 0.02  # 1% mutation rate
 pop = 50
 keep_best = 3
-collision_penalty = 0.5
+collision_penalty = 0.25
 
 class StupidRobot(Robot):
 
@@ -227,7 +227,7 @@ def after_simulation(simbot: Simbot):
         distance = Util.distance(food_pos, robot_pos)
         near = (max_distance - int(distance))/max_distance * 100
         # deduct point from collision
-        collision_loss = min(robot.collision_count * collision_penalty, 100)
+        collision_loss = min(robot.collision_count * collision_penalty, 50)
         # eat bonus
         obj_bonus =  min(robot.eat_count * 10, 50)
         # out of comfort zone
