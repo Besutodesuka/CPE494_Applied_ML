@@ -13,7 +13,7 @@ import numpy as np
 
 # # Force the program to show user's log only for "info" level or more. The info log will be disabled.
 # Config.set('kivy', 'log_level', 'debug')
-Config.set('graphics', 'maxfps', 10)
+Config.set('graphics', 'maxfps', 1)
 
 # Global variables for tracking deaths and learning curve
 death_records = []
@@ -113,16 +113,16 @@ class StupidRobot(Robot):
             self.energy -= 40
 
         # penalty for headache (backward movement or sharp turns)
-        if int(answerMove) < 0 or abs(answerTurn) > 30:
+        if int(answerMove) < 0 or abs(answerTurn) > 45:
             self.energy -= 15
 
-        # if the robot hit, it also lost energy
+        # if the robot hit, it also lost energy this make it not risk going to walls
         if self.just_hit :
-            self.energy -= 30
+            self.energy -= 5
 
         # if the robot eat food, it gets some energy back
         if self.just_eat :
-            self.energy += 300
+            self.energy += 500
 
         if self.energy < 0 :
             # die and find a new robot
@@ -150,34 +150,28 @@ class StupidRobot(Robot):
             self.lazy_count = 0
             self.headache_count = 0
             self.fitness = 0
+
+        self.fitness = self.eat_count * 100 - self.collision_count - self.lazy_count
         
     def generate_new_robot(self):
         simbot = self._sm
-        num_robots = len(simbot.robots)
 
         # Tournament selection - select from top 25% based on energy
         def select() -> StupidRobot:
-            # Get all alive robots (energy > 0)
-            alive_robots = [r for r in simbot.robots if r.energy > 0]
-            if len(alive_robots) == 0:
-                # If all dead, select from all
-                alive_robots = simbot.robots
+            alive_robots = simbot.robots
+            # Tournamet select with size 3. Select random robit let it compete
+            size = 3
+            tournament = []
+            fit_temp = []
+            while len(tournament) < size:
+                robot = random.choice(alive_robots)
+                if robot.fitness not in fit_temp:
+                    tournament.append(robot)
+                    fit_temp.append(robot.fitness)
 
             # Sort by energy (fitness)
-            alive_robots.sort(key=lambda r: r.energy, reverse=True)
-
-            # Select from top 25%
-            top_25_percent = max(1, len(alive_robots) // 4)
-            selected = random.choice(alive_robots[:top_25_percent])
-            return selected
-
-        # Rarely generate completely new random robot for diversity
-        if random.random() < 0.01:
-            temp = StupidRobot()
-            for i in range(self.NUM_RULES):
-                for k in range(self.RULE_LENGTH):
-                    temp.RULES[i][k] = random.randrange(256)
-            return temp
+            tournament.sort(key=lambda r: max(r.fitness, 0), reverse=True)
+            return tournament[0]
 
         select1 = select()
         select2 = select()
@@ -187,18 +181,28 @@ class StupidRobot(Robot):
 
         temp = StupidRobot()
 
-        # Doing crossover - Uniform crossover
-        # For each gene, randomly choose from parent1 or parent2
-        for i in range(self.NUM_RULES):
-            for k in range(self.RULE_LENGTH):
-                if random.random() < 0.5:
-                    temp.RULES[i][k] = select1.RULES[i][k]
-                else:
-                    temp.RULES[i][k] = select2.RULES[i][k]
+        RULE_LENGTH = 11
+        NUM_RULES = 10
+        crossover_point = random.randint(1, RULE_LENGTH*NUM_RULES-1)
+
+        # Initialize offspring's RULES with deep copies from select1
+        for i in range(crossover_point // RULE_LENGTH):
+            temp.RULES[i] = list(select1.RULES[i])
+        
+        # Handle the crossover point within a rule
+        rule_idx = crossover_point // RULE_LENGTH
+        point_in_rule = crossover_point % RULE_LENGTH
+
+        # Copy first part of the rule from select1, second part from select2
+        temp.RULES[rule_idx] = list(select1.RULES[rule_idx][:point_in_rule]) + list(select2.RULES[rule_idx][point_in_rule:])
+
+        # Copy remaining rules from select2
+        for i in range(crossover_point // RULE_LENGTH + 1, NUM_RULES):
+            temp.RULES[i] = list(select2.RULES[i])
 
         # Doing mutation
         # With very low probability (0.01), change one byte to a new random value
-        mutation_rate = 0.01
+        mutation_rate = 0.015
         for i in range(self.NUM_RULES):
             for k in range(self.RULE_LENGTH):
                 if random.random() < mutation_rate:
@@ -386,7 +390,8 @@ def plot_learning_curve(current_tick=None):
 
     # Save with tick number in filename for incremental plots
     if current_tick is not None:
-        filename = f'learning_curve_tick_{current_tick}.png'
+        # filename = f'learning_curve_tick_{current_tick}.png'
+        filename = 'learning_curve.png'
     else:
         filename = 'learning_curve_final.png'
 
