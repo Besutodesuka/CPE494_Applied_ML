@@ -5,6 +5,7 @@ from kivy.logger import Logger
 from kivy.config import Config
 import torch
 import torch.nn as nn
+from ann import Net
 import random
 import numpy as np
 
@@ -19,20 +20,6 @@ def scale(data, from_interval: Tuple[float, float], to_interval: Tuple[float, fl
     to_min, to_max = to_interval
     scaled_data = to_min + (data - from_min) * (to_max - to_min) / (from_max - from_min)
     return scaled_data
-
-# Define the PyTorch model
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        self.fc1 = nn.Linear(9, 32)
-        self.fc2 = nn.Linear(32, 16)
-        self.fc3 = nn.Linear(16, 2)
-
-    def forward(self, x):
-        x = torch.sigmoid(self.fc1(x))
-        x = torch.sigmoid(self.fc2(x))
-        x = torch.sigmoid(self.fc3(x))
-        return x
 
 # 2. create robot for testing the model.
 class NNRobot(Robot):
@@ -68,18 +55,12 @@ class NNRobot(Robot):
         output = output.numpy().flatten()
 
         # scale the output back
-        answerTurn = scale(output[0], (0, 1), (-90, 90))
-        answerMove = scale(output[1], (0, 1), (-10, 10))
+        answerTurn = scale(output[1], (0, 1), (-180, 180))
+        answerMove = scale(output[0], (0, 1), (-10, 10))
 
         # perform the robot movement
         self.turn(int(answerTurn))
         self.move(answerMove)
-
-        if self.stuck:
-            Deg = random.randint(-10, 10)
-            self.turn(Deg)
-            self.move(-5)
-
 
 # 3. start the simulation
 if __name__ == '__main__':
