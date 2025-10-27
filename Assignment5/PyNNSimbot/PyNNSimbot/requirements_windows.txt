@@ -1,3 +1,0 @@
--r requirements_basic.txt
-kivy.deps.sdl2
-kivy.deps.glew
