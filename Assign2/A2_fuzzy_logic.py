@@ -9,6 +9,7 @@ from kivy.core.window import Window
 from kivy.logger import Logger
 import math
 
+from fuzzyfromGA import StupidRobot
 # Number of robot that will be run
 ROBOT_NUM = 1
 

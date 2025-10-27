@@ -174,11 +174,34 @@ class StupidRobot(Robot):
         if self.target <= 45 and self.target >= 0: return self.target / 45.0
         if self.target <= -45 and self.target <= 0: return 1-(-1*self.target)/45.0
         else: return 0.0
+    
+    def load_rules_from_csv(self, filename):
+        """Load RULES from a CSV file
+        
+        Args:
+            filename: Path to the CSV file containing the rules
+        """
+        try:
+            with open(filename, "r") as f:
+                reader = csv.reader(f)
+                for i, row in enumerate(reader):
+                    if i < self.NUM_RULES and row:  # Check if row is not empty
+                        # Convert each value to integer
+                        self.RULES[i] = [int(value) for value in row]
+            Logger.info(f"Successfully loaded rules from {filename}")
+        except FileNotFoundError:
+            Logger.error(f"File {filename} not found")
+        except Exception as e:
+            Logger.error(f"Error loading rules from {filename}: {e}")
 
 def write_rule(robot, filename):
     with open(filename, "w") as f:
         writer = csv.writer(f, lineterminator="\n")
         writer.writerows(robot.RULES)
+
+def load_rule(robot, filename):
+    """Helper function to load rules from CSV for a robot"""
+    robot.load_rules_from_csv(filename)
 
 # initializing next generation robot list
 next_gen_robots = list()
