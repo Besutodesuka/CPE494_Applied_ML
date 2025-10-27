@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 
 import os, sys
 import random
@@ -152,4 +151,3 @@ class FuzzyRobot(Robot):
 
 if __name__ == '__main__':
     app = PySimbotApp(FuzzyRobot, ROBOT_NUM, mapPath=MAP_FILE, interval=TIME_INTERVAL, maxtick=MAX_TICK)
-    app.run()
