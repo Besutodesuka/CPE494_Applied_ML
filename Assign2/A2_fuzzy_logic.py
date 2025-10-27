@@ -19,6 +19,9 @@ MAX_TICK = 2500
 
 # START POINT
 START_POINT = (20, 560)
+START_POINT = (560, 20)
+START_POINT = (560, 560)
+START_POINT = (20, 20)
 
 # Map file
 MAP_FILE = 'maps/default_map.kv'
@@ -151,3 +154,4 @@ class FuzzyRobot(Robot):
 
 if __name__ == '__main__':
     app = PySimbotApp(FuzzyRobot, ROBOT_NUM, mapPath=MAP_FILE, interval=TIME_INTERVAL, maxtick=MAX_TICK)
+    app.run()
