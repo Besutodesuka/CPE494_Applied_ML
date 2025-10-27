@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 
 import os, sys
 import random
@@ -16,7 +15,7 @@ ROBOT_NUM = 1
 TIME_INTERVAL = 1.0/60 #10frame per second 
 
 # Max tick
-MAX_TICK = 3000
+MAX_TICK = 2500
 
 # START POINT
 START_POINT = (20, 560)
@@ -24,6 +23,12 @@ START_POINT = (20, 560)
 # Map file
 MAP_FILE = 'maps/default_map.kv'
 
+import csv
+# Path to your CSV log file
+csv_file = "training_log.csv"
+
+# Define CSV header (only written once)
+header = ["ir0", "ir1", "ir2", "ir3", "ir4", "ir5", "ir6", "ir7", "smell", "move", "turn"]
 class FuzzyRobot(Robot):
 
     def __init__(self):
@@ -32,7 +37,8 @@ class FuzzyRobot(Robot):
 
     def update(self):
         ''' Update method which will be called each frame
-        '''        
+        '''
+        # input that needed to be record        
         self.ir_values = self.distance()
         self.target = self.smell()
 
@@ -97,10 +103,21 @@ class FuzzyRobot(Robot):
             ans_move += m * r
 
         print(ans_turn, ans_move)
+         # If file doesn't exist, create it and write header
+        if not os.path.exists(csv_file):
+            with open(csv_file, mode="w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow(header)
+
+        # Log result immediately (avoids storing all data in memory)
+        with open(csv_file, mode="a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(self.ir_values+[self.target, ans_move, ans_turn])
 
         self.turn(ans_turn)
         self.move(ans_move)
         
+
     def mf_far(self, ir):
         distance = self.ir_values[ir]
         lower_bound = 5
@@ -134,4 +151,3 @@ class FuzzyRobot(Robot):
 
 if __name__ == '__main__':
     app = PySimbotApp(FuzzyRobot, ROBOT_NUM, mapPath=MAP_FILE, interval=TIME_INTERVAL, maxtick=MAX_TICK)
-    app.run()
