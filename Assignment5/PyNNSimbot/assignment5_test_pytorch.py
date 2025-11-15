@@ -4,8 +4,8 @@ from pysimbotlib.core import PySimbotApp, Simbot, Robot, Util
 from kivy.logger import Logger
 from kivy.config import Config
 import torch
-import torch.nn as nn
-from ann import Net
+
+from ann import Net, scale
 import random
 import numpy as np
 
@@ -15,11 +15,6 @@ Config.set('graphics', 'maxfps', 10)
 
 # 1. define scaling function
 from typing import Tuple
-def scale(data, from_interval: Tuple[float, float], to_interval: Tuple[float, float]=(0, 1)):
-    from_min, from_max = from_interval
-    to_min, to_max = to_interval
-    scaled_data = to_min + (data - from_min) * (to_max - to_min) / (from_max - from_min)
-    return scaled_data
 
 # 2. create robot for testing the model.
 class NNRobot(Robot):

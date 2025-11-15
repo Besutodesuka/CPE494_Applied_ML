@@ -1,21 +1,15 @@
 import torch
 import torch.nn as nn
 import pandas as pd
-from typing import Tuple
 import matplotlib.pyplot as plt
 import os
 import logging
-from ann import Net
+from ann import Net, scale
 logger = logging.getLogger()
-# 1. define scaling function
-def scale(data, from_interval: Tuple[float, float], to_interval: Tuple[float, float]=(0, 1)):
-    from_min, from_max = from_interval
-    to_min, to_max = to_interval
-    scaled_data = to_min + (data - from_min) * (to_max - to_min) / (from_max - from_min)
-    return scaled_data
+
 
 # 2. read data
-dataframe = pd.read_csv('history_all.csv', sep=',')
+dataframe = pd.read_csv('./CPE494_Applied_ML/Assignment5/PyNNSimbot/history_all.csv')
 dataframe.iloc[:, 0:8] = scale(dataframe.iloc[:, 0:8], from_interval=(0, 100), to_interval=(0,1)) # distance
 dataframe.iloc[:, 8] = scale(dataframe.iloc[:, 8], from_interval=(-180, 180), to_interval=(0,1)) # scale smell feature
 dataframe.iloc[:, 9] = scale(dataframe.iloc[:, 9], from_interval=(-10, 10), to_interval=(0,1))
@@ -25,18 +19,16 @@ dataframe.iloc[:, 10] = scale(dataframe.iloc[:, 10], from_interval=(-180, 180), 
 x = dataframe.iloc[:, :9].values
 y = dataframe.iloc[:, 9:].values
 
-print(x, y)
-
 # Convert to PyTorch tensors
 X_tensor = torch.tensor(x, dtype=torch.float32)
 y_tensor = torch.tensor(y, dtype=torch.float32)
 # 4. define ANN architecture, loss and optimizer
 model = Net()
-if os.path.isfile('assignment5_model.pth'):
-    model.load_state_dict(torch.load('assignment5_model.pth'))
-    logger.info("Loaded pre-trained model.")
-
-
+print(torch.isnan(X_tensor).any(), torch.isinf(X_tensor).any())
+print(torch.isnan(y_tensor).any(), torch.isinf(y_tensor).any())
+# if os.path.isfile('assignment5_model.pth'):
+#     model.load_state_dict(torch.load('assignment5_model.pth'))
+#     logger.info("Loaded pre-trained model.")
 
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -57,6 +49,8 @@ for epoch in tqdm(range(epochs)):
         # Forward pass
         outputs = model(X_batch)
         loss = criterion(outputs, y_batch)
+        if loss.item() == torch.nan:
+            print(i)
 
         # Backward and optimize
         optimizer.zero_grad()
