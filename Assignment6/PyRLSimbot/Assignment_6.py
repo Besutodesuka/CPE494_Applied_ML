@@ -28,10 +28,10 @@ cumulative_reward = 0.0
 cumulative_rewards = []
 
 # Learning hyper-parameters
-PLOT_INTERVAL = 1000
+PLOT_INTERVAL = 2000
 # Q-learning parameters (reference values)
 ALPHA_START = 0.5
-ALPHA_MIN = 0.4
+ALPHA_MIN = 0.3
 ALPHA_DECAY = 0.999
 GAMMA = 0.9
 
@@ -53,7 +53,7 @@ NEAR_DISTANCE = 20
 
 MAP_PATH = Path(__file__).with_name("maps").joinpath("default_map.kv")
 MAX_FOOD_DISTANCE = math.hypot(SIMBOTMAP_SIZE[0], SIMBOTMAP_SIZE[1])
-POTENTIAL_WEIGHT = 2.5
+POTENTIAL_WEIGHT = 3
 
 
 
@@ -114,7 +114,10 @@ def plot_event_statistics(step, eat_count, collide_count):
     plot_window.canvas.flush_events()
     
     # Also save the plot
-    plot_window.savefig('realtime_events.png', dpi=100, bbox_inches='tight')
+    if step == 100000:
+        plot_window.savefig('realtime_events_100000.png', dpi=100, bbox_inches='tight')
+    else:
+        plot_window.savefig('realtime_events.png', dpi=100, bbox_inches='tight')
     print(f"Step {step}: Event plot updated (Eats: {eat_count}, Collisions: {collide_count})")
 
 class RL_Robot(Robot):
@@ -202,7 +205,7 @@ class RL_Robot(Robot):
 
         if action_idx == 0:
             if self.stuck:
-                reward -= 2.5
+                reward -= 3
             elif abs(prev_angle) < 15:
                 reward += 1
             else:
@@ -223,21 +226,28 @@ class RL_Robot(Robot):
             self.total_rotation = self.total_rotation % 360  # Reset to remaining angle
         
         if (prev_action == 1 and action_idx == 2) or (prev_action == 2 and action_idx == 1): # alternating spin
-            reward -= 2.5
+            reward -= 3
 
         if prev_angle != -1 and next_angle != -1:
             # Reward being closer to the food (smaller absolute angle)
-            reward += 0.015 * (abs(prev_angle) - abs(next_angle))
+            reward += 0.02 * (abs(prev_angle) - abs(next_angle))
 
         if self.just_eat:
             # huge reward
             reward += 8
 
+
         if prev_distance is not None and next_distance is not None:
             # reward for closer in distance
             phi_prev = self._potential(prev_distance)
             phi_next = self._potential(next_distance)
+            # if phi_next > phi_prev:
+            #     reward += POTENTIAL_WEIGHT
+            # else:
+            #     reward -= POTENTIAL_WEIGHT
             reward += POTENTIAL_WEIGHT * (phi_next - phi_prev)
+        # if next_distance > 100:
+        #     reward -= 2.5
         
         return reward
 
@@ -323,7 +333,7 @@ if __name__ == '__main__':
     app = PySimbotApp(
         robot_cls=RL_Robot,
         num_robots=1,
-        max_tick=100000,
+        max_tick=110000,
         simulation_forever=True,
         map_path=str(MAP_PATH),
         customfn_before_simulation=randomize_objectives,
