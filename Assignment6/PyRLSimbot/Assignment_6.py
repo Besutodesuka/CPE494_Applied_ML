@@ -48,8 +48,6 @@ TURN_DEGREE = 18
 
 # Distance buckets for discretising state space
 CLOSE_DISTANCE = 15
-NEAR_DISTANCE = 20
-
 
 MAP_PATH = Path(__file__).with_name("maps").joinpath("default_map.kv")
 MAX_FOOD_DISTANCE = math.hypot(SIMBOTMAP_SIZE[0], SIMBOTMAP_SIZE[1])
@@ -134,11 +132,8 @@ class RL_Robot(Robot):
     # -------------------------- Helpers for state/action --------------------------
 
     def _discretize_distance(self, distance: float, interval: int = 5) -> int:
-        # Clean, deterministic discretization (0 = very close, 3 = far)
         if distance < CLOSE_DISTANCE:
             return 0
-        # if distance < NEAR_DISTANCE:
-        #     return 1
         return 1
 
     def _discretize_smell(self, angle: float) -> int:
@@ -199,15 +194,14 @@ class RL_Robot(Robot):
         next_angle: float,
         prev_distance: float,
         next_distance: float,
-        traverse_distance: float
     ) -> float:
         reward = -0.05  # time penalty to encourage shorter solutions
 
         if action_idx == 0:
             if self.stuck:
-                reward -= 3
+                reward -= 3 # move forward to wall is no good
             elif abs(prev_angle) < 15:
-                reward += 1
+                reward += 1 # move while facing toward food is good
             else:
                 reward += 0.05 # small reward for able to move
         else: # base penalty for unnecessary  turn (will be zero sum by below term)
@@ -225,7 +219,7 @@ class RL_Robot(Robot):
             print(f"[SPIN] Step {step_counter}: Full circle detected! total_rotation={self.total_rotation:.1f}°")
             self.total_rotation = self.total_rotation % 360  # Reset to remaining angle
         
-        if (prev_action == 1 and action_idx == 2) or (prev_action == 2 and action_idx == 1): # alternating spin
+        if (prev_action == 1 and action_idx == 2) or (prev_action == 2 and action_idx == 1): # alternating spin penalty
             reward -= 3
 
         if prev_angle != -1 and next_angle != -1:
@@ -233,21 +227,14 @@ class RL_Robot(Robot):
             reward += 0.02 * (abs(prev_angle) - abs(next_angle))
 
         if self.just_eat:
-            # huge reward
+            # huge reward for eating
             reward += 8
-
 
         if prev_distance is not None and next_distance is not None:
             # reward for closer in distance
             phi_prev = self._potential(prev_distance)
             phi_next = self._potential(next_distance)
-            # if phi_next > phi_prev:
-            #     reward += POTENTIAL_WEIGHT
-            # else:
-            #     reward -= POTENTIAL_WEIGHT
             reward += POTENTIAL_WEIGHT * (phi_next - phi_prev)
-        # if next_distance > 100:
-        #     reward -= 2.5
         
         return reward
 
@@ -283,17 +270,13 @@ class RL_Robot(Robot):
         self.just_eat = False
         current_state, prev_angle = self._observe()
         prev_distance = self._food_distance()
-        prev_x, prev_y = self.pos
 
         action_idx = self._select_action(current_state)
         self._apply_action(action_idx)
         
-
-        next_x, next_y = self.pos
-        distance_moved = euclidian_distance( prev_x, prev_y, next_x, next_y)
         next_state, next_angle = self._observe()
         next_distance = self._food_distance()
-        reward = self._calculate_reward(prev_action ,action_idx, prev_angle, next_angle, prev_distance, next_distance, distance_moved)
+        reward = self._calculate_reward(prev_action ,action_idx, prev_angle, next_angle, prev_distance, next_distance)
         prev_action = action_idx
         self._update_q_values(current_state, action_idx, reward, next_state)
         self._decay_hyperparameters()
@@ -307,20 +290,15 @@ class RL_Robot(Robot):
         
         # # Track events
         step_counter += 1
-        # Plot and reset every 1000 steps
-        # if step_counter == 1:
-            # plot_event_statistics(0, 0, 0)
+        # Plot and reset every PLOT_INTERVAL steps
         if step_counter % PLOT_INTERVAL == 0:
-            eat_rate = (self.eat_count - event_counts['eat'])/ PLOT_INTERVAL
             event_counts['eat'] = self.eat_count
-            hit_rate = (self.collision_count - event_counts['collide'])/ PLOT_INTERVAL
             event_counts['collide'] = self.collision_count # update temp
-            # diagnostics: average reward
             avg_reward = cumulative_reward / PLOT_INTERVAL if cumulative_reward != 0 else 0.0
             cumulative_rewards.append(avg_reward)
             print(f"[DIAG] Steps {step_counter-999}-{step_counter}: avg reward={avg_reward:.4f}")
             cumulative_reward = 0.0
-            plot_event_statistics(step_counter, eat_rate, hit_rate)
+            plot_event_statistics(step_counter, self.eat_count / step_counter, self.collision_count / step_counter)
 
 
 def randomize_objectives(simbot):
