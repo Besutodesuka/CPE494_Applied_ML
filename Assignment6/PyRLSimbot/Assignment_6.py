@@ -59,8 +59,6 @@ ACTIONS = ("forward", "turn_left", "turn_right")
 q_table = defaultdict(lambda: np.zeros(len(ACTIONS)))
 
 prev_action = 0
-def euclidian_distance(x1,y1,x2,y2):
-    return math.sqrt((x1-x2)**2 + (y1-y2)**2)
 
 def plot_event_statistics(step, eat_count, collide_count):
     """Plot eat and collision counts as line graphs (stacked vertically)"""
@@ -137,8 +135,6 @@ class RL_Robot(Robot):
         return 1
 
     def _discretize_smell(self, angle: float) -> int:
-        if angle == -1:
-            return 3
         if angle < -20:
             return 0
         if angle > 20:
@@ -261,8 +257,6 @@ class RL_Robot(Robot):
     def _potential(self, distance: float) -> float:
         normalized = 1.0 - min(distance / MAX_FOOD_DISTANCE, 1.0)
         return normalized
-
-    # -------------------------- Main update loop --------------------------
 
     def update(self):
         global event_counts, step_counter, cumulative_reward, cumulative_rewards, prev_action
