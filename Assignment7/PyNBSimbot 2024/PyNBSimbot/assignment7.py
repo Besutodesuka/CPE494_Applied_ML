@@ -44,25 +44,19 @@ def convert_data(data: pd.DataFrame) -> None:
     data.iloc[:, 0:8] = data.iloc[:, 0:8].applymap(dist_to_label)
     data.iloc[:, 8:9] = data.iloc[:, 8:9].applymap(angle_to_label)
 
+interval = 15
 def turnmove_to_class(row) -> str:
     turn = row['turn']
     move = row['move']
-    action = '' 
-    if -15 <= turn <= 15:
-        action += 'F'
-    if action == '':
-        if turn < 0:
-            turn+=360
-        if turn > 180:
-            action += 'L'
-        else:
-            action += 'R'
+
+    sector_index = int((turn + interval/2) % 360 // interval)
+    action = str(sector_index)
     if move < 0:
         action += '-1'
     elif move <= 5:
-        action += '5'
+        action += '2'
     elif move > 5:
-        action += '7'
+        action += '4'
     else:
         raise NotImplementedError()
     return action
@@ -71,6 +65,7 @@ class NaiveBayes:
     # Learning phase to build the CPT
     def __init__(self, filename: str):
         data = pd.read_csv(filename, sep=',')
+        data = data[(data["move"] <= 10) & ( data["move"] >= -10)]
         self.pc = {}
         self.px_given_c = {}
 
@@ -135,13 +130,7 @@ class NBRobot(Robot):
         # answerTurn, answerMove = self.nb.classify(input_data)
         # Test Phase
         action = self.nb.classify(input_data)
-
-        if action[0] == 'F':
-            answerTurn = 0
-        elif action[0] == 'L':
-            answerTurn = -30
-        elif action[0] == 'R':
-            answerTurn = 30
+        answerTurn = int(action[0]) * interval
         answerMove = int(action[1:])
 
         # perform the robot movement
