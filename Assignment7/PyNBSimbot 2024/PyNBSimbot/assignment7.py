@@ -3,7 +3,7 @@
 from pysimbotlib.core import PySimbotApp, Simbot, Robot, Util
 from kivy.logger import Logger
 from kivy.config import Config
-
+import math
 # # Force the program to show user's log only for "info" level or more. The info log will be disabled.
 # Config.set('kivy', 'log_level', 'debug')
 Config.set('graphics', 'maxfps', 10)
@@ -45,20 +45,14 @@ def convert_data(data: pd.DataFrame) -> None:
     data.iloc[:, 8:9] = data.iloc[:, 8:9].applymap(angle_to_label)
 
 interval = 15
+move_intervl = 2.5
 def turnmove_to_class(row) -> str:
     turn = row['turn']
     move = row['move']
 
     sector_index = int((turn + interval/2) % 360 // interval)
-    action = str(sector_index)
-    if move < 0:
-        action += '-1'
-    elif move <= 5:
-        action += '2'
-    elif move > 5:
-        action += '4'
-    else:
-        raise NotImplementedError()
+    action = str(sector_index) + ","
+    action += str(int(math.ceil(move/move_intervl)))
     return action
 
 class NaiveBayes:
@@ -66,6 +60,7 @@ class NaiveBayes:
     def __init__(self, filename: str):
         data = pd.read_csv(filename, sep=',')
         data = data[(data["move"] <= 10) & ( data["move"] >= -10)]
+        data = data[(data["move"] != 0) & ( data["move"] != 0)]
         self.pc = {}
         self.px_given_c = {}
 
@@ -89,7 +84,6 @@ class NaiveBayes:
     # find action that gives the highest conditional probability
     def classify(self, input_data: pd.DataFrame) -> str:
         row = input_data.iloc[0]
-        print(row)
         scores = {}
         for c in self.pc.keys():
             score = self.pc[c]
@@ -129,9 +123,9 @@ class NBRobot(Robot):
         # inference
         # answerTurn, answerMove = self.nb.classify(input_data)
         # Test Phase
-        action = self.nb.classify(input_data)
+        action = self.nb.classify(input_data).split(',')
         answerTurn = int(action[0]) * interval
-        answerMove = int(action[1:])
+        answerMove = int(action[1]) * move_intervl
 
         # perform the robot movement
         self.turn(int(answerTurn))
@@ -140,7 +134,7 @@ class NBRobot(Robot):
         if self.stuck or (answerTurn == 0 and answerMove == 0):
             Deg = random.randint(-10, 10)
             self.turn(Deg)
-            self.move(-5)
+            self.move(-4)
 
 if __name__ == '__main__':
     app = PySimbotApp(robot_cls=NBRobot, 
